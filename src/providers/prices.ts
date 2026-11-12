@@ -1,5 +1,6 @@
 import type { AgentConfig, AssetDef, Snapshot } from '../types';
 import { errMsg, type ReqOpts } from '../util/http';
+import { IST, isWeekday, localMinutes } from '../util/time';
 import { fetchCnbc, fetchCoinbase, fetchKraken, fetchNse, fetchTotalCap, fetchYahoo } from './quotes';
 
 export interface SourceStatus { ok: boolean; err?: string }
@@ -43,11 +44,18 @@ export async function fetchPrices(
   const take = (m: Map<string, Snapshot>) => { for (const [id, s] of m) if (!snaps.has(id)) snaps.set(id, s); };
 
   const cnbcWant = spot.filter((a) => !!a.cnbc);
-  const [y, c] = await Promise.all([run('yahoo', () => fetchYahoo(spot, nowSec, o), spot), run('cnbc', () => fetchCnbc(cnbcWant, o), cnbcWant)]);
-  for (const a of spot) snaps.set(a.id, pickFreshest(y.get(a.id), c.get(a.id))!);
+  // NSE (verified reachable from Cloudflare) is the exchange's own live feed: during Indian market hours it competes too
+  const m = localMinutes(nowMs, IST);
+  const indiaOpen = isWeekday(nowMs, IST) && m >= 9 * 60 && m <= 15 * 60 + 45;
+  const nseWant = indiaOpen || opts.probeAll ? spot.filter((a) => !!a.nse) : [];
+  const [y, c, n] = await Promise.all([
+    run('yahoo', () => fetchYahoo(spot, nowSec, o), spot),
+    run('cnbc', () => fetchCnbc(cnbcWant, o), cnbcWant),
+    run('nse', () => fetchNse(nseWant, nowSec, o), nseWant),
+  ]);
+  for (const a of spot) snaps.set(a.id, pickFreshest(y.get(a.id), c.get(a.id), n.get(a.id))!);
   for (const a of spot) if (!snaps.get(a.id)) snaps.delete(a.id);
 
-  take(await run('nse', () => fetchNse(gaps((a) => !!a.nse), nowSec, o), gaps((a) => !!a.nse)));
   take(await run('kraken', () => fetchKraken(gaps((a) => !!a.kraken), nowSec, o), gaps((a) => !!a.kraken)));
   take(await run('coinbase', () => fetchCoinbase(gaps((a) => !!a.coinbase), nowSec, o), gaps((a) => !!a.coinbase)));
 
@@ -65,11 +73,13 @@ export async function fetchPrices(
   return { snaps, status, missing };
 }
 
-/** Freshest timestamp wins; ties go to Yahoo (it carries the 5-minute history). History and previous close are kept from either. */
-export function pickFreshest(yahoo: Snapshot | undefined, cnbc: Snapshot | undefined): Snapshot | undefined {
-  if (!yahoo || !cnbc) return yahoo ?? cnbc;
-  if (cnbc.ts > yahoo.ts) return { ...cnbc, series: yahoo.series, prevClose: cnbc.prevClose ?? yahoo.prevClose };
-  return { ...yahoo, prevClose: yahoo.prevClose ?? cnbc.prevClose };
+/** Freshest timestamp wins; ties go to the first (Yahoo, which carries the 5-minute history). History and previous close are kept from any. */
+export function pickFreshest(yahoo?: Snapshot, cnbc?: Snapshot, nse?: Snapshot): Snapshot | undefined {
+  const cands = [yahoo, cnbc, nse].filter(Boolean) as Snapshot[];
+  if (!cands.length) return undefined;
+  let best = cands[0];
+  for (const c of cands.slice(1)) if (c.ts > best.ts) best = c;
+  return { ...best, series: best.series ?? yahoo?.series, prevClose: best.prevClose ?? cands.find((c) => c.prevClose)?.prevClose ?? null };
 }
 
 /**

@@ -167,3 +167,22 @@ describe('two-source price selection', () => {
     expect(r2.status.cnbc.ok).toBe(false); // visible to health tracking
   });
 });
+
+describe('NSE competes during Indian market hours', () => {
+  const T = Date.parse('2026-11-13T05:00:00Z'); // 10:30 IST Friday
+  const ts = T / 1000;
+  const yj = { '^NSEI': { timestamp: [ts - 1800, ts - 900], close: [25000, 25010], previousClose: 24900 } };
+  const nj = { timestamp: '13-Nov-2026 10:30:00', data: [{ index: 'NIFTY 50', last: 25100.5, previousClose: 24900 }] };
+  it('uses the exchange feed when it is fresher than a delayed Yahoo quote', async () => {
+    const f = mkFetch([[/yahoo\.com/, () => yj], [/nseindia\.com/, () => nj]]);
+    const r = await fetchPrices(config, T, { fetch: f.fetch }, { totalDue: false });
+    expect(r.snaps.get('NIFTY')).toMatchObject({ source: 'NSE India', price: 25100.5 });
+    expect(r.snaps.get('NIFTY')!.series).toBeDefined(); // Yahoo history kept for 15m/1h windows
+    expect(f.count(/nseindia\.com/)).toBe(1);
+  });
+  it('is not called outside Indian market hours (saves a subrequest, no failure noise)', async () => {
+    const f = mkFetch([[/yahoo\.com/, () => yj], [/nseindia\.com/, () => nj]]);
+    await fetchPrices(config, Date.parse('2026-11-13T15:00:00Z'), { fetch: f.fetch }, { totalDue: false });
+    expect(f.count(/nseindia\.com/)).toBe(0);
+  });
+});

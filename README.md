@@ -16,7 +16,17 @@ A personal agent that watches indices, commodities, FX, crypto, news and the mac
   The Worker also re-dispatches late digests, refreshes an empty calendar and re-enables disabled workflows (safeguards).
 ```
 
-**Status of this repo, honestly:** it is complete and tested (131 unit/integration tests, the real SQL schema run in an in-process Postgres, a live-data dry run, a Worker bundle build), but I have **not** deployed it and have **not** been able to test it with *your* CallMeBot, Telegram, Supabase, Cloudflare or Groq accounts. The first real test is step 9 below.
+**Deployment status (2026-11-13).** Already done for you: Supabase project `market-alert-agent` (Mumbai, free) with the schema applied and RLS verified; public GitHub repo `TanmayParihar/market-alert-agent` with CI green; Worker deployed at `https://market-alert-agent.market-alert-agent.workers.dev` on a `* * * * *` cron; `/probe` confirmed that Yahoo, CNBC, NSE, Kraken, Coinbase and CoinPaprika are all reachable **from Cloudflare's network**. What only you can supply is your own credentials: run **`npm run setup`** once (see "Quick finish" below). Until then the Worker runs every minute but cannot reach Supabase or send messages, so `/health` reports not-ok.
+
+### Quick finish (the only manual part)
+```bash
+npm run setup     # asks for 4 values (Supabase secret key, Telegram bot token, WhatsApp number + CallMeBot key),
+                  # finds your Telegram chat id itself, stores every secret in Cloudflare + GitHub + .dev.vars,
+                  # then sends one test alert of each severity to your phone
+```
+Then in GitHub → Actions run **calendar** once. Steps 1–8 below are already done; they stay as the from-scratch reference.
+
+**Status of the code:** complete and tested (133 unit/integration tests, the real SQL schema run in an in-process Postgres and on the live Supabase project, a live-data dry run, a Worker bundle build). Not yet exercised with *your* CallMeBot, Telegram or Groq accounts: the test alerts in `npm run setup` are the first real run.
 
 ---
 
@@ -50,9 +60,9 @@ At least two sources per category; **Yahoo and CNBC are queried together every m
 |---|---|---|
 | US indices (S&P, Nasdaq, Dow) | Yahoo + CNBC | **Real-time** (last tick within seconds; CNBC flags `realTime`) |
 | VIX | Yahoo + CNBC | CNBC real-time; **Yahoo was ~15 min behind**, hence freshest-wins |
-| Indian indices (Nifty, Bank Nifty) | Yahoo + CNBC, then NSE | **Could not measure the live delay (market was closed).** All three showed the identical closing print. Yahoo has historically delayed Indian exchanges; run query 9 in `sql/review-queries.sql` on the first trading morning to see the real lag |
+| Indian indices (Nifty, Bank Nifty) | Yahoo + CNBC, plus **NSE's own live feed during Indian market hours** (freshest wins; NSE verified reachable from Cloudflare) | **Live delay not yet measured** (market was closed during my checks; all sources showed the same closing print). Run query 9 in `sql/review-queries.sql` on the first trading morning to see each source's lag |
 | Sensex | Yahoo only (BSE's API blocks bots; CNBC has no Sensex) | single source; unmeasured |
-| India VIX | Yahoo, then NSE | single source + NSE if reachable |
+| India VIX | Yahoo + NSE (live, market hours) | NSE is the exchange's own feed |
 | Gold, silver, crude, nat gas (futures) | Yahoo + CNBC | **~10 min delayed** at both sources |
 | DXY | Yahoo + CNBC | CNBC real-time; Yahoo ~10 min behind |
 | USD/INR | Yahoo + CNBC (`INR=`) | Yahoo's last update was ~27 min old at my check: this quote updates sparsely; staleness allowance is 30 min |
@@ -180,7 +190,7 @@ Edit **only** [`agent.config.ts`](agent.config.ts): watchlist, volatility, thres
 npm install
 npm run dry-run                   # live prices/news, in-memory DB, prints alerts instead of sending
 npm run dry-run -- --ticks 5 --replay-news
-npm test                          # 131 tests
+npm test                          # 133 tests
 npm run bench                     # CPU estimate for one Worker minute
 ```
 
@@ -215,7 +225,7 @@ src/worker/              ← tick.ts (orchestrator), news, macro, cryptoSignals,
 src/digest/build.ts      ← digest text
 scripts/                 ← digest, calendar-refresh, heartbeat, weekly-review, send-test, dry-run, thresholds, cpu-bench
 .github/workflows/       ← digest, calendar, heartbeat, weekly-review, keepalive, ci
-test/                    ← 131 tests (thresholds, cooldown, dedupe, routing, failover, LLM validation, DST windows, SQL on real Postgres, end-to-end ticks)
+test/                    ← 133 tests (thresholds, cooldown, dedupe, routing, failover, LLM validation, DST windows, SQL on real Postgres, end-to-end ticks)
 ```
 
 ## 8. Known limitations and what it would cost to remove them
