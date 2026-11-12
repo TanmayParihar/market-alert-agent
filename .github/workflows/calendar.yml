@@ -1,0 +1,31 @@
+name: calendar
+
+# Refreshes the macro-event calendar in Supabase (this week + next week + fixed FOMC/RBI/India schedules) and prunes old rows.
+on:
+  schedule:
+    - cron: '15 0 * * *'   # 05:45 IST daily
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: calendar
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --omit=dev
+      - name: Refresh calendar
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: npx tsx scripts/calendar-refresh.ts

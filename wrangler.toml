@@ -1,0 +1,33 @@
+name = "market-alert-agent"
+main = "src/worker/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+# Fast path: one invocation per minute. Free plan allows 5 cron triggers/account;
+# this uses 1. (Free plan: 10 ms CPU and 50 subrequests per invocation.)
+[triggers]
+crons = ["* * * * *"]
+
+# Optional last-resort LLM fallback: Workers AI (10,000 free neurons/day, no extra key).
+# The agent works without it; remove this block if you do not want it.
+[ai]
+binding = "AI"
+
+[observability]
+enabled = true
+
+# ----------------------------------------------------------------------------
+# SECRETS (never put values here). Set each with:  npx wrangler secret put NAME
+#   SUPABASE_URL            https://<project-ref>.supabase.co
+#   SUPABASE_SERVICE_KEY    Supabase *secret* key (sb_secret_...) or legacy service_role key
+#   CALLMEBOT_PHONE         your number with country code, e.g. +919876543210
+#   CALLMEBOT_APIKEY        key CallMeBot sent you on WhatsApp
+#   TELEGRAM_BOT_TOKEN      from @BotFather
+#   TELEGRAM_CHAT_ID        your personal chat id
+#   GROQ_API_KEY            free key from console.groq.com
+#   GITHUB_TOKEN            fine-grained PAT: this repo only, Actions: read & write
+#   GITHUB_REPO             OWNER/REPO
+#   ADMIN_TOKEN             any long random string (protects the /test endpoint)
+# Optional:
+#   GEMINI_API_KEY          extra LLM fallback (Google AI Studio free key)
+# ----------------------------------------------------------------------------

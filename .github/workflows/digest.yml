@@ -1,0 +1,50 @@
+name: digest
+
+# Twice-daily digests. GitHub cron is UTC-only, so the US digest is scheduled at BOTH the EDT and EST UTC times;
+# scripts/digest.ts only sends when America/New_York local time is inside the window and today's digest was not sent yet.
+# The Worker re-dispatches this workflow itself if a scheduled run is late or dropped (workflow_dispatch below).
+on:
+  schedule:
+    - cron: '0 3 * * 1-5'     # 08:30 IST - India pre-open
+    - cron: '35 12 * * 1-5'   # 08:35 ET during daylight saving (EDT) - US pre-open
+    - cron: '35 13 * * 1-5'   # 08:35 ET during standard time (EST)  - US pre-open
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: 'Which digest'
+        type: choice
+        options: [auto, india, us]
+        default: auto
+      force:
+        description: 'Send even outside the time window / if already sent'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: digest
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --omit=dev
+      - name: Send digest
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          CALLMEBOT_PHONE: ${{ secrets.CALLMEBOT_PHONE }}
+          CALLMEBOT_APIKEY: ${{ secrets.CALLMEBOT_APIKEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DIGEST_KIND: ${{ github.event.inputs.kind || 'auto' }}
+        run: npx tsx scripts/digest.ts --kind "$DIGEST_KIND" ${{ github.event.inputs.force == 'true' && '--force' || '' }}

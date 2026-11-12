@@ -1,0 +1,32 @@
+{
+  "name": "market-alert-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Personal market-alert agent: Cloudflare Worker fast path + GitHub Actions slow path, WhatsApp (CallMeBot) with Telegram failover.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "dev": "wrangler dev --test-scheduled",
+    "deploy": "wrangler deploy",
+    "dry-run": "tsx scripts/dry-run.ts",
+    "test:alerts": "tsx scripts/send-test.ts",
+    "test:alerts:dry": "tsx scripts/send-test.ts --dry",
+    "thresholds": "tsx scripts/thresholds.ts",
+    "digest": "tsx scripts/digest.ts",
+    "calendar": "tsx scripts/calendar-refresh.ts",
+    "heartbeat": "tsx scripts/heartbeat.ts",
+    "review": "tsx scripts/weekly-review.ts",
+    "bench": "tsx scripts/cpu-bench.ts"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.16",
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0",
+    "wrangler": "^4.161.0"
+  },
+  "dependencies": {
+    "tsx": "^4.23.15"
+  }
+}
