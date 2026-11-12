@@ -17,7 +17,8 @@
     "calendar": "tsx scripts/calendar-refresh.ts",
     "heartbeat": "tsx scripts/heartbeat.ts",
     "review": "tsx scripts/weekly-review.ts",
-    "bench": "tsx scripts/cpu-bench.ts"
+    "bench": "tsx scripts/cpu-bench.ts",
+    "setup": "tsx scripts/setup.ts"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.16",
