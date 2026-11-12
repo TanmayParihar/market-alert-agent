@@ -7,6 +7,8 @@ import { runTick } from './tick';
 import { sendSamples } from '../notify/samples';
 import { request } from '../util/http';
 import { parseFeed } from '../providers/rss';
+import { fetchBybitOiDrops, fetchOkxLiquidations } from '../providers/crypto';
+import { getJson } from '../util/http';
 
 // Minimal Workers types (kept local so the repo type-checks with plain @types/node)
 interface ScheduledEvent { scheduledTime: number; cron: string }
@@ -50,6 +52,19 @@ export default {
       const budget = new Budget(48, 0);
       const pr = await fetchPrices(config, Date.now(), { budget, timeoutMs: 7000 }, { totalDue: true, probeAll: true });
       return json({ status: pr.status, got: [...pr.snaps.values()].map((s) => ({ id: s.id, price: s.price, src: s.source, ageSec: Math.round(Date.now() / 1000 - s.ts) })), missing: pr.missing, subrequests: budget.used });
+    }
+    if (url.pathname === '/crypto') {
+      // crypto-signal sources from Cloudflare's network
+      const t = async (name: string, fn: () => Promise<unknown>) => { const t0 = Date.now(); try { const r = await fn(); return { name, ok: true, ms: Date.now() - t0, r }; } catch (e) { return { name, ok: false, ms: Date.now() - t0, error: String((e as Error).message).slice(0, 120) }; } };
+      const o = { timeoutMs: 8000 };
+      return json(await Promise.all([
+        t('bybit-oi', () => fetchBybitOiDrops(['BTCUSDT', 'ETHUSDT'], o)),
+        t('okx-liq', () => fetchOkxLiquidations(5, Date.now(), o)),
+        t('coingecko', async () => Object.keys((await getJson('https://api.coingecko.com/api/v3/global', o)).data ?? {}).length),
+        t('okx-liq-raw', async () => { const j = await getJson('https://www.okx.com/api/v5/public/liquidation-orders?instType=SWAP&uly=BTC-USDT&state=filled', o); const d = j.data?.[0]; const ts = (d?.details ?? []).map((x: any) => Number(x.ts)); return { code: j.code, rows: j.data?.length, firstKeys: d ? Object.keys(d) : null, detailKeys: d?.details?.[0] ? Object.keys(d.details[0]) : null, details: d?.details?.length, newestAgeMin: ts.length ? Math.round((Date.now() - Math.max(...ts)) / 60000) : null }; }),
+        t('okx-oi', async () => (await getJson('https://www.okx.com/api/v5/public/open-interest?instType=SWAP&instId=BTC-USDT-SWAP', o)).data?.[0]),
+        t('binance-oi', async () => (await getJson('https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT', o))),
+      ]));
     }
     if (url.pathname === '/feeds') {
       // polls every news feed once FROM Cloudflare's network: status, latency, items (find throttled/blocked feeds)

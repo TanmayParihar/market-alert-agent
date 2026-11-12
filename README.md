@@ -67,8 +67,8 @@ At least two sources per category; **Yahoo and CNBC are queried together every m
 | DXY | Yahoo + CNBC | CNBC real-time; Yahoo ~10 min behind |
 | USD/INR | Yahoo + CNBC (`INR=`) | Yahoo's last update was ~27 min old at my check: this quote updates sparsely; staleness allowance is 30 min |
 | BTC, ETH, SOL | Yahoo + CNBC (BTC/ETH), then Kraken, then Coinbase | Real-time |
-| Total crypto market cap | CoinGecko, then CoinPaprika | Updates every few minutes (polled every 3) |
-| Liquidations | OKX public liquidation feed (USD), Bybit open-interest collapse (cascade proxy) | Real-time; **OKX response shape unverified**, see limitations |
+| Total crypto market cap | CoinPaprika, then CoinGecko (CoinGecko answers 429 to Cloudflare IPs) | Updates every few minutes (polled every 3) |
+| Liquidations | OKX public liquidation feed (USD), Bybit open-interest collapse (cascade proxy) | Real-time; OKX payload shape verified from Cloudflare on 2026-11-13 |
 | Breaking news | Sky News, CBS, CNBC, MarketWatch, WSJ Markets, ABC, France 24, BBC World/Business, Al Jazeera, Economic Times, Mint, BusinessLine, Cointelegraph, CoinDesk, plus official Fed, RBI and SEC press-release feeds (all verified from Cloudflare via `/feeds`) | 1–3 min polling |
 | Calendar | ForexFactory export feed (this/next week) + fixed schedules in config (FOMC, RBI MPC, India CPI/GDP) | Daily refresh |
 | Macro actuals | BLS API (US CPI, core CPI, payrolls, unemployment, wages); LLM extraction from news for everything else | Within ~1–5 min of release (BLS) / best effort (LLM) |
@@ -240,7 +240,7 @@ test/                    ← 136 tests (thresholds, cooldown, dedupe, routing, f
 | **Sensex and India VIX have a single reliable source** (Yahoo; NSE for India VIX if reachable) | BSE blocks bots, CNBC lacks them | Paid data feed |
 | **Commodity futures and DXY are ~10 min delayed** at the free sources | Exchange delay rules | Real-time futures data (paid) |
 | **CallMeBot is unofficial, personal-use, can be "full" for new activations (as on 2026-11-13; Telegram-only mode covers that), with no delivery receipts, one number, and undocumented limits**; it can break or throttle | It is a free community service | Official WhatsApp Business Cloud API via Meta or a provider such as Twilio (paid per conversation/message). Telegram already covers outages |
-| **OKX liquidation feed unverified**: `www.okx.com` timed out from my network and the US/EEA hosts returned empty lists, so I could not confirm the payload shape; the Bybit open-interest proxy was verified | Region blocking | A paid liquidation-data API (e.g. Coinglass-type) for aggregated all-venue data |
+| **OKX returns only the latest 100 liquidations**; in a violent cascade those 100 can span less than the 5-minute window, so the USD total is a lower bound. Payload shape and reachability verified from Cloudflare (it timed out from my home network, which is irrelevant to the Worker). Bybit open-interest proxy also verified | Venue API limits | An aggregated all-venue liquidation feed (paid) |
 | **Liquidations cover only OKX/Bybit**, not the whole market | Free feeds are per-venue | Aggregated paid data |
 | **Macro actuals**: US CPI/core CPI/payrolls/unemployment/wages come from BLS (structured); everything else (PPI, GDP, retail sales, Fed/RBI/ECB decisions, India data) is **LLM-extracted from news** and may be missed ("result not auto-captured" message) or occasionally wrong | No free keyed-free calendar with actuals exists (ForexFactory's feed has forecast/previous only) | A paid economic-calendar API with actuals |
 | **India CPI/GDP dates are approximate** (flagged "~date approx" in alerts); FOMC and RBI MPC dates are from the official pages as of today | Fixed list in `agent.config.ts` | Verify dates yourself each quarter; no cost |

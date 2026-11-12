@@ -155,18 +155,19 @@ export async function fetchCoinbase(assets: AssetDef[], nowSec: number, o: ReqOp
 }
 
 // ---------------------------------------------------------------- Total crypto market cap
+// CoinPaprika first: CoinGecko answers HTTP 429 to Cloudflare's shared IPs (verified from the deployed Worker).
 export async function fetchTotalCap(asset: AssetDef, nowSec: number, o: ReqOpts): Promise<Snapshot> {
   try {
-    const j = await getJson('https://api.coingecko.com/api/v3/global', o);
-    const cap = num(j?.data?.total_market_cap?.usd);
-    const chg = num(j?.data?.market_cap_change_percentage_24h_usd);
-    if (cap === null) throw new Error('CoinGecko: no market cap');
-    return { id: asset.id, price: cap, prevClose: chg !== null ? cap / (1 + chg / 100) : null, ts: nowSec, source: 'CoinGecko' };
-  } catch (first) {
-    const j = await getJson('https://api.coinpaprika.com/v1/global', o).catch(() => { throw first; });
+    const j = await getJson('https://api.coinpaprika.com/v1/global', o);
     const cap = num(j?.market_cap_usd);
     const chg = num(j?.market_cap_change_24h);
-    if (cap === null) throw first;
+    if (cap === null) throw new Error('CoinPaprika: no market cap');
     return { id: asset.id, price: cap, prevClose: chg !== null ? cap / (1 + chg / 100) : null, ts: nowSec, source: 'CoinPaprika' };
+  } catch (first) {
+    const j = await getJson('https://api.coingecko.com/api/v3/global', o).catch(() => { throw first; });
+    const cap = num(j?.data?.total_market_cap?.usd);
+    const chg = num(j?.data?.market_cap_change_percentage_24h_usd);
+    if (cap === null) throw first;
+    return { id: asset.id, price: cap, prevClose: chg !== null ? cap / (1 + chg / 100) : null, ts: nowSec, source: 'CoinGecko' };
   }
 }
