@@ -243,12 +243,15 @@ export const config: AgentConfig = {
   },
 
   // Free-tier LLM chain, tried in order. dailyCap is OUR self-imposed ceiling (stays under the provider limit).
+  // If your Groq key lists other models (curl -H "Authorization: Bearer $GROQ_API_KEY" https://api.groq.com/openai/v1/models), edit the ids here.
   llm: {
     timeoutMs: 12000,
     chain: [
-      { provider: 'groq', model: 'llama-3.3-70b-versatile', dailyCap: 800 },
-      { provider: 'groq', model: 'llama-3.1-8b-instant', dailyCap: 8000 },
-      { provider: 'workersai', model: '@cf/meta/llama-3.1-8b-instruct', dailyCap: 120 },
+      // Models your Groq key can actually use (checked 2026-11-13 via GET /openai/v1/models; Llama models were NOT enabled).
+      // Real free limits from Groq's response headers for these: 1,000 requests/day, 8,000 tokens/minute.
+      { provider: 'groq', model: 'openai/gpt-oss-120b', dailyCap: 400 },
+      { provider: 'groq', model: 'openai/gpt-oss-20b', dailyCap: 400 },
+      { provider: 'workersai', model: '@cf/meta/llama-3.1-8b-instruct-fp8', dailyCap: 120 },
       { provider: 'gemini', model: 'gemini-2.5-flash-lite', dailyCap: 150 },
     ],
   },

@@ -26,7 +26,7 @@ npm run setup     # asks for 2 required values (Supabase secret key, Telegram bo
 ```
 Then in GitHub → Actions run **calendar** once. Steps 1–8 below are already done; they stay as the from-scratch reference.
 
-**Status of the code:** complete and tested (135 unit/integration tests, the real SQL schema run in an in-process Postgres and on the live Supabase project, a live-data dry run, a Worker bundle build). Not yet exercised with *your* CallMeBot, Telegram or Groq accounts: the test alerts in `npm run setup` are the first real run.
+**Status of the code:** complete and tested (136 unit/integration tests, the real SQL schema run in an in-process Postgres and on the live Supabase project, a live-data dry run, a Worker bundle build). Not yet exercised with *your* CallMeBot, Telegram or Groq accounts: the test alerts in `npm run setup` are the first real run.
 
 ---
 
@@ -42,7 +42,7 @@ Checked on **2026-11-13**. "Docs" = read from the vendor's page today; "Measured
 | **GitHub Actions** (slow path) | Public repo: standard runners free. Private repo: $12 compute credit/month (≈ 2,000 Linux min, my calculation, not stated as minutes). Scheduled workflows: **minimum interval 5 min, can be delayed or dropped under load, auto-disabled on PUBLIC repos after 60 days without repo activity, run only on the default branch** | Docs | ~100 min/month for digests, calendar, weekly review, keepalive; heartbeat adds 4,320 min/month at `*/10` (1,440 at `*/30`) because each job bills a 1-minute minimum | Public: unlimited. Private: switch heartbeat to `*/30` or `*/60` |
 | **CallMeBot WhatsApp** | Free, "only for personal use", sends only to your own activated number. **No rate limit or text-length limit is published** | Docs (page states none) | 5–30 messages/day typical; hard cap 3 messages/minute, ≤ 900 chars each | Unknown by nature: see limitations |
 | **Telegram Bot API** | ~1 msg/s per chat (bursts may 429), 20 msg/min in groups, ~30 msg/s bulk; 4096 chars per message | Docs (rate limits); length from Bot API docs (not re-fetched) | ≤ 3 messages/minute with 1.1 s gaps | > 95 % |
-| **Groq** (primary LLM) | `llama-3.1-8b-instant`: 30 RPM, 14,400 requests/day; `openai/gpt-oss-20b/120b`: 30 RPM, 1,000/day | **Third-party** aggregators (Groq's own page showed only the paid-plan table); the agent also reads `retry-after`/429 | Only *new, relevant, non-duplicate* headlines, batched 12 per call: typically 30–150 calls/day. Self-imposed caps: 800/day (70B), 8,000/day (8B) | > 85 % even on the pessimistic reading |
+| **Groq** (primary LLM) | For THIS account: `openai/gpt-oss-120b` and `openai/gpt-oss-20b`, **1,000 requests/day and 8,000 tokens/minute each** (read from Groq's response headers on 2026-11-13). Llama models were not enabled for the key even though Groq's public page lists them | Measured (response headers) | Only *new, relevant, non-duplicate* headlines, batched 12 per call: typically 30–150 calls/day. Self-imposed caps: 400/day per model; a 429 (e.g. a daily token limit) triggers cool-down and fail-over | > 55 % |
 | **Google Gemini** (optional 3rd LLM) | **Google no longer publishes per-model free limits** on its rate-limit page | Docs + search | Off unless you add a key; capped at 150/day | n/a |
 | **BLS public API v1** (US CPI/payrolls actuals) | Keyless; 25 queries/day, 25 series/query (BLS documentation, from memory) | Endpoint measured working keyless today; limit not re-fetched | ≤ 9 queries per release day; hard cap 20/day in code | > 60 % |
 | **Yahoo Finance spark**, **CNBC quote API**, **NSE**, **Kraken**, **Coinbase**, **CoinGecko**, **CoinPaprika**, **OKX**, **Bybit**, **Google News RSS**, publisher RSS feeds | Keyless, **no published free-tier terms** (Yahoo, CNBC, NSE, OKX/Bybit feeds are unofficial/undocumented) | Measured working today (OKX unreachable from my network, see limitations) | 1 call/min each for Yahoo+CNBC, 1 per 3 min for CoinGecko, 16 RSS feeds at 1 call per 1–3 min | Far below usual limits; blocking, not quota, is the risk |
@@ -192,7 +192,7 @@ Edit **only** [`agent.config.ts`](agent.config.ts): watchlist, volatility, thres
 npm install
 npm run dry-run                   # live prices/news, in-memory DB, prints alerts instead of sending
 npm run dry-run -- --ticks 5 --replay-news
-npm test                          # 135 tests
+npm test                          # 136 tests
 npm run bench                     # CPU estimate for one Worker minute
 ```
 
@@ -227,7 +227,7 @@ src/worker/              ← tick.ts (orchestrator), news, macro, cryptoSignals,
 src/digest/build.ts      ← digest text
 scripts/                 ← digest, calendar-refresh, heartbeat, weekly-review, send-test, dry-run, thresholds, cpu-bench
 .github/workflows/       ← digest, calendar, heartbeat, weekly-review, keepalive, ci
-test/                    ← 135 tests (thresholds, cooldown, dedupe, routing, failover, LLM validation, DST windows, SQL on real Postgres, end-to-end ticks)
+test/                    ← 136 tests (thresholds, cooldown, dedupe, routing, failover, LLM validation, DST windows, SQL on real Postgres, end-to-end ticks)
 ```
 
 ## 8. Known limitations and what it would cost to remove them

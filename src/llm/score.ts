@@ -85,6 +85,8 @@ async function callGroq(model: string, sys: string, user: string, env: Env, time
       headers: { 'content-type': 'application/json', authorization: `Bearer ${env.GROQ_API_KEY}` },
       body: JSON.stringify({
         model, temperature: 0, max_tokens: 1500, response_format: { type: 'json_object' },
+        // gpt-oss models are reasoning models: keep thinking short so the JSON answer fits and tokens/minute stay low
+        ...(model.includes('gpt-oss') ? { reasoning_effort: 'low' } : {}),
         messages: [{ role: 'system', content: sys }, { role: 'user', content: user }],
       }),
     });

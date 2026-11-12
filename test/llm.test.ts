@@ -62,21 +62,22 @@ describe('free-tier provider chain', () => {
   it('uses the first provider and counts usage', async () => {
     const f = mkFetch([[/groq\.com/, () => ok]]);
     const r = await scoreBatch(items, IDS, config, env, undefined, NOW, { fetch: f.fetch });
-    expect(r.provider).toBe('groq:llama-3.3-70b-versatile');
-    expect(r.usage.counts['groq:llama-3.3-70b-versatile']).toBe(1);
+    expect(r.provider).toBe('groq:openai/gpt-oss-120b');
+    expect(r.usage.counts['groq:openai/gpt-oss-120b']).toBe(1);
     expect(f.calls[0].url).toContain('chat/completions');
     expect(JSON.parse(f.calls[0].body!).response_format).toEqual({ type: 'json_object' });
+    expect(JSON.parse(f.calls[0].body!).reasoning_effort).toBe('low'); // gpt-oss reasoning models
   });
 
   it('on a 429 falls over to the next model and cools the limited one down', async () => {
-    const f = mkFetch([[/groq\.com/, (_u, init) => (String(init?.body).includes('70b') ? new Response('rate', { status: 429, headers: { 'retry-after': '120' } }) : ok)]]);
+    const f = mkFetch([[/groq\.com/, (_u, init) => (String(init?.body).includes('gpt-oss-120b') ? new Response('rate', { status: 429, headers: { 'retry-after': '120' } }) : ok)]]);
     const r = await scoreBatch(items, IDS, config, env, undefined, NOW, { fetch: f.fetch });
-    expect(r.provider).toBe('groq:llama-3.1-8b-instant');
-    expect(r.usage.until['groq:llama-3.3-70b-versatile']).toBe(NOW + 120_000);
+    expect(r.provider).toBe('groq:openai/gpt-oss-20b');
+    expect(r.usage.until['groq:openai/gpt-oss-120b']).toBe(NOW + 120_000);
     // next call skips the cooling-down model entirely
     const f2 = mkFetch([[/groq\.com/, () => ok]]);
     await scoreBatch(items, IDS, config, env, r.usage, NOW + 30_000, { fetch: f2.fetch });
-    expect(JSON.parse(f2.calls[0].body!).model).toBe('llama-3.1-8b-instant');
+    expect(JSON.parse(f2.calls[0].body!).model).toBe('openai/gpt-oss-20b');
   });
 
   it('reports exhaustion when every configured provider is limited (caller then uses keywords)', async () => {
@@ -88,7 +89,7 @@ describe('free-tier provider chain', () => {
 
   it('respects our own daily caps', async () => {
     const f = mkFetch([[/groq\.com/, () => ok]]);
-    const usage = { day: '2026-11-13', counts: { 'groq:llama-3.3-70b-versatile': 800, 'groq:llama-3.1-8b-instant': 8000 }, until: {} };
+    const usage = { day: '2026-11-13', counts: { 'groq:openai/gpt-oss-120b': 400, 'groq:openai/gpt-oss-20b': 400 }, until: {} };
     const r = await scoreBatch(items, IDS, config, env, usage, NOW, { fetch: f.fetch });
     expect(r.exhausted).toBe(true);
     expect(f.calls).toHaveLength(0);
@@ -96,10 +97,10 @@ describe('free-tier provider chain', () => {
 
   it('resets the counters on a new UTC day', async () => {
     const f = mkFetch([[/groq\.com/, () => ok]]);
-    const usage = { day: '2026-11-12', counts: { 'groq:llama-3.3-70b-versatile': 800 }, until: {} };
+    const usage = { day: '2026-11-12', counts: { 'groq:openai/gpt-oss-120b': 400 }, until: {} };
     const r = await scoreBatch(items, IDS, config, env, usage, NOW, { fetch: f.fetch });
-    expect(r.provider).toBe('groq:llama-3.3-70b-versatile');
-    expect(r.usage.counts['groq:llama-3.3-70b-versatile']).toBe(1);
+    expect(r.provider).toBe('groq:openai/gpt-oss-120b');
+    expect(r.usage.counts['groq:openai/gpt-oss-120b']).toBe(1);
   });
 
   it('no provider configured is "not exhausted" (keyword mode, no false alarm)', async () => {
@@ -111,6 +112,6 @@ describe('free-tier provider chain', () => {
     const f = mkFetch([[/groq\.com/, () => new Response('rate', { status: 429 })]]);
     const AI = { run: async () => ({ response: JSON.stringify({ results: [{ id: 'h1', is_market_moving: true, severity: 'MEDIUM', one_line_reason: 'x' }] }) }) };
     const r = await scoreBatch(items, IDS, config, { ...env, AI }, undefined, NOW, { fetch: f.fetch });
-    expect(r.provider).toBe('workersai:@cf/meta/llama-3.1-8b-instruct');
+    expect(r.provider).toBe('workersai:@cf/meta/llama-3.1-8b-instruct-fp8');
   });
 });
