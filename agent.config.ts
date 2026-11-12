@@ -204,41 +204,30 @@ export const config: AgentConfig = {
     maxAgeMinutesForInstant: 120,
     similarity: 0.6,         // lower = merges more paraphrases (risk: different stories merged); higher = more duplicate alerts
     maxMediumPerHour: 8,
+    // Google News RSS is NOT used: it answered every query with HTTP 503 from Cloudflare's network (throttled IPs),
+    // while all the publisher feeds below work from there (verified with the Worker's /feeds endpoint).
     feeds: [
-      // Google News RSS queries aggregate Reuters/AP/Bloomberg/etc. and update within minutes.
-      { id: 'gn-geo', name: 'Google News: geopolitics', kind: 'targeted', trust: 'aggregator', everyMin: 1,
-        url: gn('(war OR invasion OR missile OR airstrike OR ceasefire OR sanctions OR blockade OR "nuclear") when:1h') },
-      { id: 'gn-crisis', name: 'Google News: banks/exchanges/crises', kind: 'targeted', trust: 'aggregator', everyMin: 1,
-        url: gn('("bank collapse" OR "bank run" OR "trading halted" OR "exchange hack" OR "circuit breaker" OR default OR bankruptcy OR "emergency meeting") when:1h') },
-      { id: 'gn-policy', name: 'Google News: central banks/policy', kind: 'targeted', trust: 'aggregator', everyMin: 2,
-        url: gn('("central bank" OR "rate cut" OR "rate hike" OR "surprise" OR tariff OR "capital controls" OR "debt ceiling") (Fed OR ECB OR RBI OR Treasury OR government) when:1h') },
-      { id: 'gn-crypto', name: 'Google News: crypto regulation', kind: 'targeted', trust: 'aggregator', everyMin: 2,
-        url: gn('(bitcoin OR crypto OR stablecoin) (SEC OR ban OR regulation OR hack OR ETF OR exchange OR liquidation) when:1h') },
-      { id: 'gn-india', name: 'Google News: India markets/policy', kind: 'targeted', trust: 'aggregator', everyMin: 2,
-        url: gn('(RBI OR SEBI OR Sensex OR Nifty OR rupee OR "Union Budget") when:1h') },
-
-      { id: 'cnbc-top', name: 'CNBC Top News', kind: 'general', trust: 'media', everyMin: 1,
-        url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html' },
-      { id: 'mw-rt', name: 'MarketWatch Real-time', kind: 'general', trust: 'media', everyMin: 1,
-        url: 'https://feeds.content.dowjones.io/public/rss/mw_realtimeheadlines' },
-      { id: 'bbc-world', name: 'BBC World', kind: 'general', trust: 'media', everyMin: 2,
-        url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },
-      { id: 'bbc-biz', name: 'BBC Business', kind: 'general', trust: 'media', everyMin: 2,
-        url: 'https://feeds.bbci.co.uk/news/business/rss.xml' },
-      { id: 'aljazeera', name: 'Al Jazeera', kind: 'general', trust: 'media', everyMin: 2,
-        url: 'https://www.aljazeera.com/xml/rss/all.xml' },
-      { id: 'fed-press', name: 'Federal Reserve press releases', kind: 'official', trust: 'official', everyMin: 2,
-        url: 'https://www.federalreserve.gov/feeds/press_all.xml' },
-      { id: 'rbi-press', name: 'RBI press releases', kind: 'official', trust: 'official', everyMin: 2,
-        url: 'https://www.rbi.org.in/pressreleases_rss.xml' },
-      { id: 'sec-press', name: 'SEC press releases', kind: 'official', trust: 'official', everyMin: 3,
-        url: 'https://www.sec.gov/news/pressreleases.rss' },
-      { id: 'et-markets', name: 'Economic Times Markets', kind: 'general', trust: 'media', everyMin: 3,
-        url: 'https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms' },
-      { id: 'mint-markets', name: 'Mint Markets', kind: 'general', trust: 'media', everyMin: 3,
-        url: 'https://www.livemint.com/rss/markets' },
-      { id: 'cointelegraph', name: 'Cointelegraph', kind: 'crypto', trust: 'media', everyMin: 3,
-        url: 'https://cointelegraph.com/rss' },
+      // --- every minute: fastest breaking-news sources
+      { id: 'skynews-world', name: 'Sky News World', kind: 'general', trust: 'media', everyMin: 1, url: 'https://feeds.skynews.com/feeds/rss/world.xml' },
+      { id: 'cbs-world', name: 'CBS News World', kind: 'general', trust: 'media', everyMin: 1, url: 'https://www.cbsnews.com/latest/rss/world' },
+      { id: 'cnbc-top', name: 'CNBC Top News', kind: 'general', trust: 'media', everyMin: 1, url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html' },
+      { id: 'mw-rt', name: 'MarketWatch Real-time', kind: 'general', trust: 'media', everyMin: 1, url: 'https://feeds.content.dowjones.io/public/rss/mw_realtimeheadlines' },
+      // --- every 2 minutes
+      { id: 'wsj-markets', name: 'WSJ Markets', kind: 'general', trust: 'media', everyMin: 2, url: 'https://feeds.a.dj.com/rss/RSSMarketsMain.xml' },
+      { id: 'abc-intl', name: 'ABC News International', kind: 'general', trust: 'media', everyMin: 2, url: 'https://abcnews.go.com/abcnews/internationalheadlines' },
+      { id: 'france24', name: 'France 24', kind: 'general', trust: 'media', everyMin: 2, url: 'https://www.france24.com/en/rss' },
+      { id: 'bbc-world', name: 'BBC World', kind: 'general', trust: 'media', everyMin: 2, url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },
+      { id: 'bbc-biz', name: 'BBC Business', kind: 'general', trust: 'media', everyMin: 2, url: 'https://feeds.bbci.co.uk/news/business/rss.xml' },
+      { id: 'aljazeera', name: 'Al Jazeera', kind: 'general', trust: 'media', everyMin: 2, url: 'https://www.aljazeera.com/xml/rss/all.xml' },
+      { id: 'fed-press', name: 'Federal Reserve press releases', kind: 'official', trust: 'official', everyMin: 2, url: 'https://www.federalreserve.gov/feeds/press_all.xml' },
+      { id: 'rbi-press', name: 'RBI press releases', kind: 'official', trust: 'official', everyMin: 2, url: 'https://www.rbi.org.in/pressreleases_rss.xml' },
+      // --- every 3 minutes
+      { id: 'sec-press', name: 'SEC press releases', kind: 'official', trust: 'official', everyMin: 3, url: 'https://www.sec.gov/news/pressreleases.rss' },
+      { id: 'et-markets', name: 'Economic Times Markets', kind: 'general', trust: 'media', everyMin: 3, url: 'https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms' },
+      { id: 'mint-markets', name: 'Mint Markets', kind: 'general', trust: 'media', everyMin: 3, url: 'https://www.livemint.com/rss/markets' },
+      { id: 'hindu-bl', name: 'The Hindu BusinessLine Markets', kind: 'general', trust: 'media', everyMin: 3, url: 'https://www.thehindubusinessline.com/markets/feeder/default.rss' },
+      { id: 'cointelegraph', name: 'Cointelegraph', kind: 'crypto', trust: 'media', everyMin: 3, url: 'https://cointelegraph.com/rss' },
+      { id: 'coindesk', name: 'CoinDesk', kind: 'crypto', trust: 'media', everyMin: 3, url: 'https://www.coindesk.com/arc/outboundfeeds/rss/' },
     ],
   },
 
@@ -386,7 +375,3 @@ export const config: AgentConfig = {
   },
 };
 
-/** Google News RSS search URL builder. */
-function gn(query: string): string {
-  return `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
-}

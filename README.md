@@ -7,7 +7,7 @@ A personal agent that watches indices, commodities, FX, crypto, news and the mac
   Yahoo + CNBC (prices) ─┐                                    ┌───────────────────────────────────────────────┐
   Kraken/Coinbase/NSE ───┤                                    │ FAST PATH  src/worker/tick.ts                  │
   OKX/Bybit (liquidation)┼──▶ detect ─▶ score ─▶ dedupe ─▶ ──▶│ prices · news · macro · crypto · health        │──▶ WhatsApp (CallMeBot)
-  16 RSS / Google News ──┤    triggers  severity  cooldown    │ 2 Supabase round-trips + ≤ ~20 fetches/minute  │──▶ Telegram (failover / HIGH+)
+  18 RSS news feeds ────┤    triggers  severity  cooldown    │ 2 Supabase round-trips + ≤ ~20 fetches/minute  │──▶ Telegram (failover / HIGH+)
   Free LLM (Groq → …) ───┤                                    └───────────────┬───────────────────────────────┘
   BLS (macro actuals) ───┘                                                    │ state, alert history, heartbeat
                                                                       Supabase Postgres (free)
@@ -45,12 +45,12 @@ Checked on **2026-11-13**. "Docs" = read from the vendor's page today; "Measured
 | **Groq** (primary LLM) | For THIS account: `openai/gpt-oss-120b` and `openai/gpt-oss-20b`, **1,000 requests/day and 8,000 tokens/minute each** (read from Groq's response headers on 2026-11-13). Llama models were not enabled for the key even though Groq's public page lists them | Measured (response headers) | Only *new, relevant, non-duplicate* headlines, batched 12 per call: typically 30–150 calls/day. Self-imposed caps: 400/day per model; a 429 (e.g. a daily token limit) triggers cool-down and fail-over | > 55 % |
 | **Google Gemini** (optional 3rd LLM) | **Google no longer publishes per-model free limits** on its rate-limit page | Docs + search | Off unless you add a key; capped at 150/day | n/a |
 | **BLS public API v1** (US CPI/payrolls actuals) | Keyless; 25 queries/day, 25 series/query (BLS documentation, from memory) | Endpoint measured working keyless today; limit not re-fetched | ≤ 9 queries per release day; hard cap 20/day in code | > 60 % |
-| **Yahoo Finance spark**, **CNBC quote API**, **NSE**, **Kraken**, **Coinbase**, **CoinGecko**, **CoinPaprika**, **OKX**, **Bybit**, **Google News RSS**, publisher RSS feeds | Keyless, **no published free-tier terms** (Yahoo, CNBC, NSE, OKX/Bybit feeds are unofficial/undocumented) | Measured working today (OKX unreachable from my network, see limitations) | 1 call/min each for Yahoo+CNBC, 1 per 3 min for CoinGecko, 16 RSS feeds at 1 call per 1–3 min | Far below usual limits; blocking, not quota, is the risk |
+| **Yahoo Finance spark**, **CNBC quote API**, **NSE**, **Kraken**, **Coinbase**, **CoinGecko**, **CoinPaprika**, **OKX**, **Bybit**, 18 publisher RSS feeds | Keyless, **no published free-tier terms** (Yahoo, CNBC, NSE, OKX/Bybit feeds are unofficial/undocumented) | Measured working today (OKX unreachable from my network, see limitations) | 1 call/min each for Yahoo+CNBC, 1 per 3 min for CoinGecko, 16 RSS feeds at 1 call per 1–3 min | Far below usual limits; blocking, not quota, is the risk |
 | **ForexFactory export feed** (calendar) | Rate-limits hard; `ff_calendar_nextweek.json` returned 404 today (published late in the week) | Measured | 2 requests/day from GitHub (never per minute) | Large |
 
 **Worker CPU (the one to watch).** The free plan allows 10 ms of CPU per run. I benchmarked a full minute on real captured responses (`npm run bench`, Node/V8 on a laptop with extra test-harness overhead): **~4–5 ms warm average, p95 ~8 ms, a cold first run ~12–15 ms**. In production, network waiting is not charged as CPU, so real numbers should be at or below these, but a *cold isolate* can be near the limit. Mitigations built in: feeds are staggered (`everyMin`), only the first 15 items of a feed are parsed, JSON ring buffers are tiny, regexes are precompiled. If Cloudflare logs show "exceeded CPU", raise `everyMin` on a few feeds in `agent.config.ts` (each ≈ 0.3 ms) or remove feeds. After deploying, check *Workers → market-alert-agent → Metrics → CPU time*.
 
-**Latency.** Prices: polled every minute, so alert ≈ source time + ≤ 1 min. News: fast feeds (Google News geopolitics/crises, CNBC, MarketWatch) are polled every minute, others every 2–3 min, then ~1–3 s for the LLM, so typically **1–2 min** from appearing in the feed; the 3-minute feeds (SEC, Economic Times, Mint, Cointelegraph) can take up to ~3–4 min. Google News itself indexes with a delay of a few minutes.
+**Latency.** Prices: polled every minute, so alert ≈ source time + ≤ 1 min. News: the four fastest feeds (Sky News World, CBS World, CNBC, MarketWatch) are polled every minute, others every 2–3 min, then ~1–3 s for the LLM, so typically **1–2 min** from appearing in the feed; the 3-minute feeds (SEC, Economic Times, Mint, BusinessLine, Cointelegraph, CoinDesk) can take up to ~3–4 min. Google News RSS was tried first and dropped: from Cloudflare it answers every query with HTTP 503 (throttled IPs), so only publisher feeds are used.
 
 ## 2. Data sources and how fresh they are
 
@@ -69,7 +69,7 @@ At least two sources per category; **Yahoo and CNBC are queried together every m
 | BTC, ETH, SOL | Yahoo + CNBC (BTC/ETH), then Kraken, then Coinbase | Real-time |
 | Total crypto market cap | CoinGecko, then CoinPaprika | Updates every few minutes (polled every 3) |
 | Liquidations | OKX public liquidation feed (USD), Bybit open-interest collapse (cascade proxy) | Real-time; **OKX response shape unverified**, see limitations |
-| Breaking news | 5 Google News queries + CNBC, MarketWatch, BBC World/Business, Al Jazeera, Economic Times, Mint, Cointelegraph, plus official Fed, RBI and SEC press-release feeds | 1–3 min polling |
+| Breaking news | Sky News, CBS, CNBC, MarketWatch, WSJ Markets, ABC, France 24, BBC World/Business, Al Jazeera, Economic Times, Mint, BusinessLine, Cointelegraph, CoinDesk, plus official Fed, RBI and SEC press-release feeds (all verified from Cloudflare via `/feeds`) | 1–3 min polling |
 | Calendar | ForexFactory export feed (this/next week) + fixed schedules in config (FOMC, RBI MPC, India CPI/GDP) | Daily refresh |
 | Macro actuals | BLS API (US CPI, core CPI, payrolls, unemployment, wages); LLM extraction from news for everything else | Within ~1–5 min of release (BLS) / best effort (LLM) |
 

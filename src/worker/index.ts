@@ -5,6 +5,8 @@ import { Budget } from '../util/http';
 import type { Env } from '../types';
 import { runTick } from './tick';
 import { sendSamples } from '../notify/samples';
+import { request } from '../util/http';
+import { parseFeed } from '../providers/rss';
 
 // Minimal Workers types (kept local so the repo type-checks with plain @types/node)
 interface ScheduledEvent { scheduledTime: number; cron: string }
@@ -48,6 +50,19 @@ export default {
       const budget = new Budget(48, 0);
       const pr = await fetchPrices(config, Date.now(), { budget, timeoutMs: 7000 }, { totalDue: true, probeAll: true });
       return json({ status: pr.status, got: [...pr.snaps.values()].map((s) => ({ id: s.id, price: s.price, src: s.source, ageSec: Math.round(Date.now() / 1000 - s.ts) })), missing: pr.missing, subrequests: budget.used });
+    }
+    if (url.pathname === '/feeds') {
+      // polls every news feed once FROM Cloudflare's network: status, latency, items (find throttled/blocked feeds)
+      const out = await Promise.all(config.news.feeds.map(async (f) => {
+        const t0 = Date.now();
+        try {
+          const { text } = await request(f.url, { timeoutMs: 15000, maxBytes: 300_000 });
+          return { id: f.id, ok: true, ms: Date.now() - t0, items: parseFeed(text, 15).length };
+        } catch (e) {
+          return { id: f.id, ok: false, ms: Date.now() - t0, error: String((e as Error).message).slice(0, 80) };
+        }
+      }));
+      return json(out);
     }
     return new Response('not found', { status: 404 });
   },

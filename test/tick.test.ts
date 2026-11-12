@@ -127,14 +127,14 @@ describe('news pipeline', () => {
     const old = { title: 'Markets calm ahead of data', pub: T0 - 3600_000, guid: 'old1' };
 
     // tick 1: first ever poll => history seeded, nothing scored or sent
-    const t1 = await tick(store, T0, [...base(T0), [/news\.google\.com/, () => rss([{ ...old, source: 'Reuters' }])]]);
+    const t1 = await tick(store, T0, [...base(T0), [/skynews.com/, () => rss([{ ...old, source: 'Reuters' }])]]);
     expect(t1.s.rows.filter((r) => r.kind === 'news')).toHaveLength(0);
-    expect(store.feeds['gn-geo'].seen.length).toBe(1);
+    expect(store.feeds['skynews-world'].seen.length).toBe(1);
 
     // tick 2: a new headline appears in one aggregator feed (keyword scorer: no LLM key configured)
     const now2 = T0 + 60_000;
     const war = { title: 'Russia declares war on NATO member Poland - Reuters', pub: now2 - 30_000, guid: 'w1', source: 'Reuters' };
-    const t2 = await tick(store, now2, [...base(now2), [/news\.google\.com/, () => rss([war, { ...old, source: 'Reuters' }])]]);
+    const t2 = await tick(store, now2, [...base(now2), [/skynews.com/, () => rss([war, { ...old, source: 'Reuters' }])]]);
     const n2 = t2.s.rows.filter((r) => r.kind === 'news');
     expect(n2).toHaveLength(1);
     expect(n2[0]).toMatchObject({ severity: 'HIGH', status: 'pending' });
@@ -144,7 +144,7 @@ describe('news pipeline', () => {
     // tick 3: CNBC carries the same story => corroborated => WORLD-ENDING escalation
     const now3 = T0 + 120_000;
     const t3 = await tick(store, now3, [...base(now3),
-      [/news\.google\.com/, () => rss([war, { ...old, source: 'Reuters' }])],
+      [/skynews.com/, () => rss([war, { ...old, source: 'Reuters' }])],
       [/cnbc\.com\/id/, () => rss([{ title: 'Russia declares war on NATO member Poland', pub: now3 - 10_000, guid: 'c1' }])],
     ]);
     const esc = t3.s.rows.find((r) => r.kind === 'news' && r.severity === 'WORLD_ENDING')!;
@@ -165,9 +165,9 @@ describe('news pipeline', () => {
       return { choices: [{ message: { content: JSON.stringify({ results: ids.map((id) => ({ id, is_market_moving: true, severity: 'WORLD_ENDING', affected_assets: ['SPX'], likely_direction: { SPX: 'down' }, one_line_reason: 'model was fooled' })) }) } }] };
     };
     const feed = (n: number) => rss(n ? [{ title: evil, pub: now - 5000, guid: 'x1', source: 'Sketchy Blog' }] : [{ title: 'Calm', pub: now - 7200_000, guid: 'c0' }]);
-    await tick(store, now, [[/yahoo\.com/, () => yahoo(now)], [/news\.google\.com/, () => feed(0)], [WA, waOk], [TG, tgOk]], env);
+    await tick(store, now, [[/yahoo\.com/, () => yahoo(now)], [/skynews.com/, () => feed(0)], [WA, waOk], [TG, tgOk]], env);
     const t2 = await tick(store, now + 60_000, [
-      [/yahoo\.com/, () => yahoo(now + 60_000)], [/news\.google\.com/, () => feed(1)],
+      [/yahoo\.com/, () => yahoo(now + 60_000)], [/skynews.com/, () => feed(1)],
       [/groq\.com/, (_u, init) => llmReply(String(init?.body))], [WA, waOk], [TG, tgOk],
     ], env);
     const n = t2.s.rows.filter((r) => r.kind === 'news');
