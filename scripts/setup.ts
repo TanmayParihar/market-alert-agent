@@ -80,6 +80,13 @@ for (const k of GH_SECRETS) {
   console.log(`  ${r.status === 0 ? '✓' : '✗'} ${k}${r.status === 0 ? '' : '  (' + (r.stderr || '').trim().split('\n')[0] + ')'}`);
 }
 
+console.log('\nEnabling the GitHub workflows (paused until now so they would not fail before your secrets existed)...');
+for (const w of ['heartbeat.yml', 'digest.yml', 'calendar.yml', 'weekly-review.yml']) {
+  const r = run('gh', ['workflow', 'enable', w, '--repo', cur.GITHUB_REPO], '');
+  console.log(`  ${r.status === 0 ? '✓' : '✗'} ${w}`);
+}
+run('gh', ['workflow', 'run', 'calendar.yml', '--repo', cur.GITHUB_REPO], ''); // fill the macro calendar right away
+
 console.log('\nSending one test alert of each severity to your phone...');
 const t = spawnSync('npm', ['run', 'test:alerts'], { shell: sh, stdio: 'inherit' });
 console.log(t.status === 0 ? '\nAll done. Expect 4 WhatsApp messages and 2 Telegram messages (HIGH and WORLD-ENDING go to both).\n' : '\nSome test messages did not arrive: see the table above and the README troubleshooting section.\n');
