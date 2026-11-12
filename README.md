@@ -20,13 +20,13 @@ A personal agent that watches indices, commodities, FX, crypto, news and the mac
 
 ### Quick finish (the only manual part)
 ```bash
-npm run setup     # asks for 4 values (Supabase secret key, Telegram bot token, WhatsApp number + CallMeBot key),
+npm run setup     # asks for 2 required values (Supabase secret key, Telegram bot token) + optional WhatsApp (CallMeBot) and Groq/GitHub keys,
                   # finds your Telegram chat id itself, stores every secret in Cloudflare + GitHub + .dev.vars,
                   # then sends one test alert of each severity to your phone
 ```
 Then in GitHub → Actions run **calendar** once. Steps 1–8 below are already done; they stay as the from-scratch reference.
 
-**Status of the code:** complete and tested (133 unit/integration tests, the real SQL schema run in an in-process Postgres and on the live Supabase project, a live-data dry run, a Worker bundle build). Not yet exercised with *your* CallMeBot, Telegram or Groq accounts: the test alerts in `npm run setup` are the first real run.
+**Status of the code:** complete and tested (135 unit/integration tests, the real SQL schema run in an in-process Postgres and on the live Supabase project, a live-data dry run, a Worker bundle build). Not yet exercised with *your* CallMeBot, Telegram or Groq accounts: the test alerts in `npm run setup` are the first real run.
 
 ---
 
@@ -124,8 +124,10 @@ The repo contains **no secrets** (`.dev.vars` is git-ignored), so it can be publ
 2. Open your new bot and send it any message (e.g. `/start`). A bot cannot message you until you do.
 3. In a browser open `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates` → find `"chat":{"id":123456789` → that number is your **chat id**. (Do this in your own browser only; the token is a password.)
 
-### Step 3: CallMeBot WhatsApp activation (primary channel)
-1. Save **+34 644 37 67 94** in your phone contacts (any name). *That is the number on callmebot.com/blog/free-api-whatsapp-messages today; it has changed in the past, so use the one on that page.*
+### Step 3: CallMeBot WhatsApp activation (primary channel, OPTIONAL)
+> **Heads-up (2026-11-13):** callmebot.com now shows *"The bot is currently full. Please check back in a few days; once slots are available, the phone number will be visible"* and hides its number, so new activations are impossible until slots reopen (status page: https://www.callmebot.com/callmebot-servers-availability/). **The agent runs fully on Telegram without it**: when `CALLMEBOT_PHONE`/`CALLMEBOT_APIKEY` are not set it sends everything (including HIGH/WORLD-ENDING, digests and health alerts) to Telegram, with no WhatsApp attempts, no failover prefixes and no "WhatsApp down" notices. When a slot opens, finish the steps below and re-run `npm run setup`; WhatsApp switches on automatically. The API itself was verified up (it answered a dummy call with "APIKey is invalid").
+
+1. Save the bot number shown on callmebot.com/blog/free-api-whatsapp-messages in your phone contacts (any name). *It was +34 644 37 67 94 earlier today, and has changed in the past, so always use the one on that page.*
 2. In WhatsApp send that contact exactly: `I allow callmebot to send me messages`
 3. Wait for the reply `API Activated for your phone number. Your APIKEY is 123456`. If nothing arrives within 2 minutes, CallMeBot says to try again after 24 hours.
 4. Note your **phone** with country code (`+91XXXXXXXXXX`) and the **API key**.
@@ -190,7 +192,7 @@ Edit **only** [`agent.config.ts`](agent.config.ts): watchlist, volatility, thres
 npm install
 npm run dry-run                   # live prices/news, in-memory DB, prints alerts instead of sending
 npm run dry-run -- --ticks 5 --replay-news
-npm test                          # 133 tests
+npm test                          # 135 tests
 npm run bench                     # CPU estimate for one Worker minute
 ```
 
@@ -225,7 +227,7 @@ src/worker/              ← tick.ts (orchestrator), news, macro, cryptoSignals,
 src/digest/build.ts      ← digest text
 scripts/                 ← digest, calendar-refresh, heartbeat, weekly-review, send-test, dry-run, thresholds, cpu-bench
 .github/workflows/       ← digest, calendar, heartbeat, weekly-review, keepalive, ci
-test/                    ← 133 tests (thresholds, cooldown, dedupe, routing, failover, LLM validation, DST windows, SQL on real Postgres, end-to-end ticks)
+test/                    ← 135 tests (thresholds, cooldown, dedupe, routing, failover, LLM validation, DST windows, SQL on real Postgres, end-to-end ticks)
 ```
 
 ## 8. Known limitations and what it would cost to remove them
@@ -237,7 +239,7 @@ test/                    ← 133 tests (thresholds, cooldown, dedupe, routing, f
 | **Indian index data may be delayed** (Yahoo historically ~15 min; live lag unmeasured because markets were closed) | Free feeds are not exchange-licensed | Licensed NSE/BSE real-time data (paid, exchange licensing applies). Measure first with query 9 |
 | **Sensex and India VIX have a single reliable source** (Yahoo; NSE for India VIX if reachable) | BSE blocks bots, CNBC lacks them | Paid data feed |
 | **Commodity futures and DXY are ~10 min delayed** at the free sources | Exchange delay rules | Real-time futures data (paid) |
-| **CallMeBot is unofficial, personal-use, with no delivery receipts, one number, and undocumented limits**; it can break or throttle | It is a free community service | Official WhatsApp Business Cloud API via Meta or a provider such as Twilio (paid per conversation/message). Telegram already covers outages |
+| **CallMeBot is unofficial, personal-use, can be "full" for new activations (as on 2026-11-13; Telegram-only mode covers that), with no delivery receipts, one number, and undocumented limits**; it can break or throttle | It is a free community service | Official WhatsApp Business Cloud API via Meta or a provider such as Twilio (paid per conversation/message). Telegram already covers outages |
 | **OKX liquidation feed unverified**: `www.okx.com` timed out from my network and the US/EEA hosts returned empty lists, so I could not confirm the payload shape; the Bybit open-interest proxy was verified | Region blocking | A paid liquidation-data API (e.g. Coinglass-type) for aggregated all-venue data |
 | **Liquidations cover only OKX/Bybit**, not the whole market | Free feeds are per-venue | Aggregated paid data |
 | **Macro actuals**: US CPI/core CPI/payrolls/unemployment/wages come from BLS (structured); everything else (PPI, GDP, retail sales, Fed/RBI/ECB decisions, India data) is **LLM-extracted from news** and may be missed ("result not auto-captured" message) or occasionally wrong | No free keyed-free calendar with actuals exists (ForexFactory's feed has forecast/previous only) | A paid economic-calendar API with actuals |

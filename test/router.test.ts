@@ -110,3 +110,27 @@ describe('WhatsApp health notices', () => {
     expect(again.f.count(TG)).toBe(0);
   });
 });
+
+describe('Telegram-only mode (WhatsApp not configured, e.g. CallMeBot bot full)', () => {
+  const NO_WA = { ...ENV, CALLMEBOT_PHONE: '', CALLMEBOT_APIKEY: '' };
+  const runNoWa = (items: DeliverItem[]) => {
+    const f = mkFetch([[WA, waOk], [TG, tgOk]]);
+    return deliver(items, NO_WA, config, { fails: 0, down: false }, { fetch: f.fetch, sleepFn: noSleep, now: () => NOW }).then((r) => ({ r, f }));
+  };
+  it('never touches WhatsApp and adds no failover prefix or down notices', async () => {
+    const { r, f } = await runNoWa([item('a', 'MEDIUM'), item('b', 'HIGH'), item('c', 'WORLD_ENDING')]);
+    expect(f.count(WA)).toBe(0);
+    expect(f.count(TG)).toBe(1); // merged into one message
+    const text = textOf(f.calls[0]);
+    expect(text).not.toContain('WhatsApp');
+    expect(text).toContain('3 alerts');
+    expect(r.outcomes.every((o) => o.status === 'sent' && o.channels.join() === 'telegram')).toBe(true);
+    expect(r.waChanged).toBe(false);
+    expect(r.wa).toEqual({ fails: 0, down: false });
+  });
+  it('a Telegram failure keeps the alert pending for retry', async () => {
+    const f = mkFetch([[TG, () => new Response('x', { status: 500 })]]);
+    const r = await deliver([item('a', 'MEDIUM')], NO_WA, config, { fails: 0, down: false }, { fetch: f.fetch, sleepFn: noSleep, now: () => NOW });
+    expect(r.outcomes[0].status).toBe('pending');
+  });
+});

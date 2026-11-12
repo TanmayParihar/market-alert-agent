@@ -1,7 +1,7 @@
 import type { AgentConfig, Env, Severity } from '../types';
 import { EMOJI, LABEL, SEVERITIES } from '../core/severity';
 import { formatAlert } from '../core/format';
-import { sendTelegram, sendWhatsApp, type ChannelIO } from './channels';
+import { sendTelegram, sendWhatsApp, waConfigured, type ChannelIO } from './channels';
 
 const SAMPLE: Record<Severity, { headline: string; what: string; impact: string }> = {
   LOW: { headline: 'Sample: gold up 0.6% in an hour', what: 'Gold at 3,912.40 (+0.62% in 1h). Routine move: this kind of alert only appears in the digest.', impact: 'GOLD ↑, SILVER ↑ (likely direction)' },
@@ -24,6 +24,11 @@ export async function sendSamples(env: Env, cfg: AgentConfig, opts: { dryRun?: b
     const s = SAMPLE[sev];
     const text = formatAlert({ severity: sev, headline: s.headline, what: s.what, impact: s.impact, source: 'TEST (not a real event)', sourceTime: now }, now);
     const both = sev === 'HIGH' || sev === 'WORLD_ENDING';
+    if (!waConfigured(env, io)) {
+      const tgOnly = (await sendTelegram(env, text, cfg, io)).ok;
+      results.push({ severity: `${EMOJI[sev]} ${LABEL[sev]}`, whatsapp: undefined, telegram: tgOnly });
+      continue;
+    }
     const wa = await sendWhatsApp(env, text, cfg, io);
     let tg: boolean | undefined;
     if (both) tg = (await sendTelegram(env, text, cfg, io)).ok;

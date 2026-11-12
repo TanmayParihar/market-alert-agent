@@ -18,7 +18,7 @@ const env = loadEnv();
 const dry = hasFlag('--dry');
 const force = hasFlag('--force');
 requireEnv(env, ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY']);
-if (!dry) requireEnv(env, ['CALLMEBOT_PHONE', 'CALLMEBOT_APIKEY', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID']);
+if (!dry) requireEnv(env, ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID']);
 
 const kindArg = (argValue('--kind') ?? process.env.DIGEST_KIND ?? 'auto').toLowerCase();
 const kinds = (kindArg === 'auto' || kindArg === '' ? ['india', 'us'] : [kindArg]) as Array<'india' | 'us'>;

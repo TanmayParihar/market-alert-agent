@@ -1,7 +1,7 @@
 import type { AgentConfig, DeliveryAttempt, Env } from '../types';
 import { splitText } from '../core/format';
 import { sleep } from '../util/http';
-import { sendTelegram, sendWhatsApp, type ChannelIO } from './channels';
+import { sendTelegram, sendWhatsApp, waConfigured, type ChannelIO } from './channels';
 
 export interface PlainResult { ok: boolean; channels: string[]; attempts: DeliveryAttempt[] }
 
@@ -27,6 +27,10 @@ export async function sendPlain(env: Env, cfg: AgentConfig, text: string, io: Ch
     return ok;
   };
 
+  if (!waConfigured(env, io)) {
+    const ok = await sendAll(tgChunks, (x) => sendTelegram(env, x, cfg, io));
+    return { ok, channels: ok ? ['telegram'] : [], attempts };
+  }
   if (opts.both) {
     const [w, t] = await Promise.all([sendAll(waChunks, (x) => sendWhatsApp(env, x, cfg, io)), sendAll(tgChunks, (x) => sendTelegram(env, x, cfg, io))]);
     return { ok: w || t, channels: [...(w ? ['whatsapp'] : []), ...(t ? ['telegram'] : [])], attempts };

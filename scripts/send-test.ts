@@ -6,11 +6,11 @@ import { hasFlag, loadEnv, requireEnv } from './_env';
 
 const env = loadEnv();
 const dry = hasFlag('--dry');
-if (!dry) requireEnv(env, ['CALLMEBOT_PHONE', 'CALLMEBOT_APIKEY', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID']);
+if (!dry) requireEnv(env, ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID']);
 
 const res = await sendSamples(env, config, { dryRun: dry });
 console.table(res);
-const failed = res.filter((r) => r.whatsapp === false && r.telegram !== true);
+const failed = res.filter((r) => r.whatsapp !== true && r.telegram !== true);
 if (!dry && failed.length) {
   console.error('Some samples reached NO channel. Check CallMeBot activation / Telegram chat id (see README).');
   process.exit(1);

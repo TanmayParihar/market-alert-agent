@@ -2,7 +2,7 @@ import type { AgentConfig, AlertStatus, DeliveryAttempt, Env, Severity } from '.
 import { atLeast } from '../core/severity';
 import { mergeAlerts, type Msgable } from '../core/format';
 import { sleep } from '../util/http';
-import { sendTelegram, sendWhatsApp, type ChannelIO, type SendResult } from './channels';
+import { sendTelegram, sendWhatsApp, waConfigured, type ChannelIO, type SendResult } from './channels';
 
 export interface DeliverItem {
   id: string;
@@ -85,6 +85,17 @@ export async function deliver(items: DeliverItem[], env: Env, cfg: AgentConfig, 
       });
     }
   };
+
+  // ---- Telegram-only mode (WhatsApp not configured): everything goes to Telegram, merged, no failover noise
+  if (!waConfigured(env, io)) {
+    const m = mergeAlerts(items.map((i) => i.msg), cfg.channels.telegramMaxChars, maxMsgs, now);
+    if (m.messages.length) {
+      const t = await sendSeq(m.messages, (x) => sendTelegram(env, x, cfg, io), sl);
+      record(items.filter((_, i) => m.included.includes(i)), t.ok, t.ok ? ['telegram'] : [], t.attempts);
+    }
+    for (const i of m.overflowed) outcomes.push({ id: items[i].id, status: 'pending', channels: [], attempts: [], reason: 'queued: message limit this minute' });
+    return { outcomes, wa: state, waChanged: false };
+  }
 
   // ---- BOTH group: WhatsApp and Telegram in parallel, always (same messages on both channels)
   if (both.length) {

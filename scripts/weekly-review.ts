@@ -7,7 +7,7 @@ import { hasFlag, loadEnv, requireEnv } from './_env';
 const env = loadEnv();
 const dry = hasFlag('--dry');
 requireEnv(env, ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY']);
-if (!dry) requireEnv(env, ['CALLMEBOT_PHONE', 'CALLMEBOT_APIKEY', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID']);
+if (!dry) requireEnv(env, ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID']);
 const store = new SupabaseStore(env);
 const since = new Date(Date.now() - 7 * 86400_000).toISOString();
 const rows = await store.query<any>(`alerts?select=severity,status,kind,asset_ids,reason,channels&created_at=gte.${since}&kind=neq.test&kind=neq.digest&limit=5000`);

@@ -11,6 +11,13 @@ export interface ChannelIO {
   now?: () => number;
 }
 
+/**
+ * WhatsApp is OPTIONAL. Without a CallMeBot phone + key (e.g. CallMeBot's bot was full and nobody could activate), the
+ * agent runs Telegram-only: no WhatsApp attempts, no "WhatsApp failed" prefixes, no "WhatsApp looks down" notices.
+ * Adding the two secrets later switches WhatsApp on automatically. Dry runs always show both channels.
+ */
+export const waConfigured = (env: Env, io?: { dryRun?: boolean }): boolean => !!io?.dryRun || !!(env.CALLMEBOT_PHONE && env.CALLMEBOT_APIKEY);
+
 export interface SendResult { ok: boolean; attempts: DeliveryAttempt[] }
 
 const CALLMEBOT_FAIL = /error|not (valid|activated|registered)|invalid|blocked|wrong|unauthori[sz]ed|forbidden/i;

@@ -50,10 +50,13 @@ if (!cur.TELEGRAM_CHAT_ID) {
   }
 }
 
-console.log('\n3/4  WhatsApp via CallMeBot. Save +34 644 37 67 94 as a contact, WhatsApp it: I allow callmebot to send me messages');
-console.log('     Wait for the reply with your API key (if nothing in 2 minutes, retry after 24 hours).');
-await need('CALLMEBOT_PHONE', 'Your WhatsApp number with country code, e.g. +91XXXXXXXXXX', { validate: (v) => (/^\+\d{8,15}$/.test(v) ? null : 'use the form +91XXXXXXXXXX') });
-await need('CALLMEBOT_APIKEY', 'The CallMeBot API key');
+console.log('\n3/4  WhatsApp via CallMeBot is OPTIONAL. If callmebot.com says "the bot is currently full" (as it did on 2026-11-13),');
+console.log('     press Enter twice: everything is delivered on Telegram until you add WhatsApp later (just re-run this script).');
+console.log('     When slots open: save the bot number shown on callmebot.com, WhatsApp it "I allow callmebot to send me messages",');
+console.log('     then paste your number and the API key it replies with.');
+await need('CALLMEBOT_PHONE', 'Your WhatsApp number, e.g. +91XXXXXXXXXX', { optional: true, validate: (v) => (/^\+\d{8,15}$/.test(v) ? null : 'use the form +91XXXXXXXXXX') });
+if (cur.CALLMEBOT_PHONE) await need('CALLMEBOT_APIKEY', 'The CallMeBot API key', { optional: true });
+if (!cur.CALLMEBOT_PHONE || !cur.CALLMEBOT_APIKEY) console.log('  -> Telegram-only mode (WhatsApp skipped).');
 
 console.log('\n4/4  Optional extras (press Enter to skip; the agent works without them)');
 console.log('     Groq key (console.groq.com/keys) = better news scoring. Without it Cloudflare Workers AI + keywords are used.');
@@ -76,6 +79,7 @@ for (const k of SECRETS) {
 }
 console.log('\nStoring secrets in GitHub Actions...');
 for (const k of GH_SECRETS) {
+  if (!cur[k]) { console.log(`  - ${k} not set, skipped`); continue; }
   const r = run('gh', ['secret', 'set', k, '--repo', cur.GITHUB_REPO], cur[k]);
   console.log(`  ${r.status === 0 ? '✓' : '✗'} ${k}${r.status === 0 ? '' : '  (' + (r.stderr || '').trim().split('\n')[0] + ')'}`);
 }
@@ -89,4 +93,4 @@ run('gh', ['workflow', 'run', 'calendar.yml', '--repo', cur.GITHUB_REPO], ''); /
 
 console.log('\nSending one test alert of each severity to your phone...');
 const t = spawnSync('npm', ['run', 'test:alerts'], { shell: sh, stdio: 'inherit' });
-console.log(t.status === 0 ? '\nAll done. Expect 4 WhatsApp messages and 2 Telegram messages (HIGH and WORLD-ENDING go to both).\n' : '\nSome test messages did not arrive: see the table above and the README troubleshooting section.\n');
+console.log(t.status === 0 ? `\nAll done. Expect ${cur.CALLMEBOT_APIKEY ? '4 WhatsApp messages and 2 Telegram messages (HIGH and WORLD-ENDING go to both)' : '4 Telegram messages (WhatsApp is not configured)'}.\n` : '\nSome test messages did not arrive: see the table above and the README troubleshooting section.\n');
