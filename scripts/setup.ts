@@ -71,6 +71,28 @@ const GH_SECRETS = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'CALLMEBOT_PHONE', '
 const sh = process.platform === 'win32';
 const run = (cmd: string, args: string[], input: string) => spawnSync(cmd, args, { input, shell: sh, encoding: 'utf8' });
 
+// ---- make sure THIS terminal is logged in to Cloudflare and GitHub (logins made in another shell/profile are not shared)
+console.log('\nChecking Cloudflare and GitHub logins in this terminal...');
+const probe = (cmd: string, args: string[]) => { const r = spawnSync(cmd, args, { shell: sh, encoding: 'utf8' }); return { status: r.status, out: `${r.stdout ?? ''}${r.stderr ?? ''}` }; };
+const cf = probe('npx', ['wrangler', 'whoami']);
+if (!/logged in/i.test(cf.out) || /not authenticated/i.test(cf.out)) {
+  console.log('  Cloudflare: not logged in here. A browser will open: sign in with the account that hosts the Worker, then click Allow.');
+  spawnSync('npx', ['wrangler', 'login'], { shell: sh, stdio: 'inherit' });
+} else console.log('  ✓ Cloudflare logged in');
+const ghs = probe('gh', ['auth', 'status']);
+if (ghs.status !== 0) {
+  console.log('  GitHub: not logged in here. Follow the prompts (browser, one-time code).');
+  spawnSync('gh', ['auth', 'login', '-h', 'github.com', '-p', 'https', '-s', 'repo,workflow', '-w'], { shell: sh, stdio: 'inherit' });
+} else if (!/workflow/.test(ghs.out)) {
+  console.log('  GitHub: adding the "workflow" permission (browser, one-time code).');
+  spawnSync('gh', ['auth', 'refresh', '-h', 'github.com', '-s', 'workflow'], { shell: sh, stdio: 'inherit' });
+} else console.log('  ✓ GitHub logged in');
+const hasWorker = probe('npx', ['wrangler', 'secret', 'list', '--name', 'market-alert-agent']);
+if (hasWorker.status !== 0) {
+  console.error('\n✗ The Worker "market-alert-agent" was not found on the Cloudflare account you are logged in to.\n  Run `npx wrangler logout`, then `npm run setup` again and sign in with admin.lumira@gmail.com (the account that hosts it).');
+  process.exit(1);
+}
+
 console.log('\nStoring secrets in Cloudflare (Worker)...');
 for (const k of SECRETS) {
   if (!cur[k]) continue;
