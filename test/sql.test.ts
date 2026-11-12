@@ -104,3 +104,19 @@ describe('schema.sql', () => {
     expect(rows.every((r) => r.relrowsecurity === true)).toBe(true);
   });
 });
+
+import { SupabaseStore, supabaseHeaders } from '../src/db/supabase';
+import { ENV, mkFetch } from './helpers';
+
+describe('Supabase request headers', () => {
+  it('never look like a browser (secret keys are rejected for browser User-Agents)', async () => {
+    expect(supabaseHeaders('sb_secret_x')['user-agent']).not.toMatch(/mozilla/i);
+    const f = mkFetch([[/supabase\.co/, () => ({ assets: [], feeds: [], kv: {}, pending: [], events: [], event_count_48h: 0 })]]);
+    let seen: Record<string, string> = {};
+    const spy = async (u: string, init?: RequestInit) => { seen = init!.headers as Record<string, string>; return f.fetch(u, init); };
+    await new SupabaseStore(ENV, { fetch: spy }).loadTickState(Date.now());
+    expect(seen['user-agent']).toBe('market-alert-agent/1.0');
+    expect(seen.apikey).toBe('sb_secret_test');
+    expect(seen.authorization).toBeUndefined(); // new-style secret keys go in apikey only
+  });
+});

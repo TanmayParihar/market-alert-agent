@@ -7,7 +7,9 @@ import { getJson, request, type Budget, type Fetcher } from '../util/http';
  * Secret keys (sb_secret_...) go in the `apikey` header only; legacy service_role JWTs also go in Authorization.
  */
 export function supabaseHeaders(key: string): Record<string, string> {
-  const h: Record<string, string> = { apikey: key, 'content-type': 'application/json' };
+  // Supabase answers 401 "Forbidden use of secret API key in browser" when the User-Agent looks like a browser
+  // (anything starting with "Mozilla"), so server calls must identify themselves plainly.
+  const h: Record<string, string> = { apikey: key, 'content-type': 'application/json', 'user-agent': 'market-alert-agent/1.0' };
   if (key.startsWith('eyJ')) h.authorization = `Bearer ${key}`;
   return h;
 }
